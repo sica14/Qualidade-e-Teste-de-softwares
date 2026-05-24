@@ -1,0 +1,35 @@
+pipeline {
+  agent any
+
+  environment {
+    JMETER_TEST = '/workspace/galeriamusical/galeriamusical.jmx'
+  }
+
+  stages {
+    stage('Preparar resultados') {
+      steps {
+        sh '''
+          rm -rf "$WORKSPACE/results"
+          mkdir -p "$WORKSPACE/results/html-report"
+        '''
+      }
+    }
+
+    stage('Executar JMeter') {
+      steps {
+        sh '''
+          jmeter -n \
+            -t "$JMETER_TEST" \
+            -l "$WORKSPACE/results/galeriamusical-results.jtl" \
+            -e -o "$WORKSPACE/results/html-report"
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      archiveArtifacts artifacts: 'results/**/*', allowEmptyArchive: true
+    }
+  }
+}
