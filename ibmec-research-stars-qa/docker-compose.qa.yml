@@ -1,0 +1,111 @@
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: qa/jenkins/Dockerfile
+    container_name: irs-jenkins-qa
+    user: root
+    ports:
+      - "8090:8080"
+      - "50001:50000"
+    environment:
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
+    volumes:
+      - ./:/workspace
+      - irs-jenkins-home:/var/jenkins_home
+      - irs-maven-repo:/root/.m2
+    depends_on:
+      - backend
+      - frontend
+      - selenium-chrome
+      - influxdb
+      - grafana
+    networks:
+      - irs-qa-net
+
+  backend:
+    image: maven:3.9-eclipse-temurin-21
+    container_name: irs-backend-qa
+    working_dir: /workspace
+    command: mvn -B spring-boot:run -Dmaven.test.skip=true
+    ports:
+      - "8082:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/workspace/data/researchstars-qa;AUTO_SERVER=TRUE
+    volumes:
+      - ./:/workspace
+      - irs-maven-repo:/root/.m2
+    networks:
+      - irs-qa-net
+
+  frontend:
+    image: node:20-alpine
+    container_name: irs-frontend-qa
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://host.docker.internal:8082/api/v1
+      CHOKIDAR_USEPOLLING: "true"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - irs-qa-net
+
+  selenium-chrome:
+    image: selenium/standalone-chrome:latest
+    container_name: irs-selenium-chrome-qa
+    shm_size: 2gb
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    networks:
+      - irs-qa-net
+
+  influxdb:
+    image: influxdb:1.8
+    container_name: irs-influxdb-qa
+    ports:
+      - "8086:8086"
+      - "2003:2003"
+    environment:
+      INFLUXDB_DB: jmeter
+      INFLUXDB_HTTP_AUTH_ENABLED: "false"
+    volumes:
+      - irs-influxdb-data:/var/lib/influxdb
+      - ./qa/influxdb/influxdb.conf:/etc/influxdb/influxdb.conf:ro
+    command: influxd -config /etc/influxdb/influxdb.conf
+    networks:
+      - irs-qa-net
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: irs-grafana-qa
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - irs-grafana-data:/var/lib/grafana
+      - ./qa/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./qa/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - influxdb
+    networks:
+      - irs-qa-net
+
+networks:
+  irs-qa-net:
+    driver: bridge
+
+volumes:
+  irs-jenkins-home:
+  irs-maven-repo:
+  irs-influxdb-data:
+  irs-grafana-data:

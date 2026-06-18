@@ -1,0 +1,79 @@
+pipeline {
+  agent {
+    node {
+      label ''
+      customWorkspace '/workspace'
+    }
+  }
+
+  environment {
+    APP_DIR = '/workspace'
+    SELENIUM_REMOTE_URL = 'http://selenium-chrome:4444/wd/hub'
+    FRONTEND_URL = 'http://host.docker.internal:5173/login'
+    JMETER_TEST = '/workspace/qa/jmeter/ibmec-research-stars.jmx'
+    JMETER_RESULTS = '/workspace/qa/results'
+  }
+
+  stages {
+    stage('Aguardar ambiente Docker') {
+      steps {
+        sh '''
+          for url in \
+            http://backend:8080/api/v1/auth/login \
+            http://frontend:5173/login \
+            http://selenium-chrome:4444/status
+          do
+            echo "Aguardando $url"
+            for i in $(seq 1 60); do
+              if curl -s -o /dev/null "$url"; then
+                echo "$url respondeu"
+                break
+              fi
+              sleep 5
+              if [ "$i" = "60" ]; then
+                echo "Timeout aguardando $url"
+                exit 1
+              fi
+            done
+          done
+        '''
+      }
+    }
+
+    stage('Teste de unidade - JUnit') {
+      steps {
+        sh 'cd "$APP_DIR" && mvn -B test'
+      }
+      post {
+        always {
+          junit 'target/surefire-reports/*.xml'
+        }
+      }
+    }
+
+    stage('Teste funcional - Selenium WebDriver') {
+      steps {
+        sh 'cd "$APP_DIR/qa/selenium" && mvn -B clean compile exec:java'
+      }
+    }
+
+    stage('Teste de desempenho - JMeter') {
+      steps {
+        sh '''
+          rm -rf "$JMETER_RESULTS"
+          mkdir -p "$JMETER_RESULTS/html-report"
+          jmeter -n \
+            -t "$JMETER_TEST" \
+            -l "$JMETER_RESULTS/ibmec-research-stars-results.jtl" \
+            -e -o "$JMETER_RESULTS/html-report"
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      archiveArtifacts artifacts: 'qa/results/**/*', allowEmptyArchive: true
+    }
+  }
+}
