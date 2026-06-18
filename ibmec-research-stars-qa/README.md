@@ -111,12 +111,13 @@ O JMeter gera resultados em:
 qa/results/
 ```
 
-Esses arquivos sao gerados em tempo de execucao e nao precisam ser versionados.
+Esses arquivos sao gerados em tempo de execucao e nao precisam ser versionados..
 
 As metricas do JMeter sao gravadas no InfluxDB e visualizadas no Grafana em:
 
 ```text
 Dashboards > JMeter > JMeter IBMEC Research Stars
 ```
+
 
 
