@@ -119,15 +119,4 @@ As metricas do JMeter sao gravadas no InfluxDB e visualizadas no Grafana em:
 Dashboards > JMeter > JMeter IBMEC Research Stars
 ```
 
-## Arquivos nao versionados
 
-Nao foram incluidos arquivos gerados localmente, como:
-
-```text
-qa/results/
-qa/selenium/target/
-target/
-data/
-jmeter.log
-.idea/
-```
